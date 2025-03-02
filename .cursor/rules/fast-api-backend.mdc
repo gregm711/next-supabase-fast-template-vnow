@@ -1,0 +1,208 @@
+---
+description: 
+globs: 
+---
+---
+description: "Guidelines for working on the FastAPI backend. These rules enforce best practices around code quality, organization, security, and integrations with Postgres, Supabase, Twilio, and Eleven Labs."
+globs:
+  - "fast-api/**"
+---
+## Fast Api Backend Rules
+
+Use the following specification and guidelines as you build out this FastAPI application.  
+Write the complete code for every step.  
+**Do not skip or partially do a task** — the goal is to fully complete whatever is requested.
+
+---
+
+## Overview
+
+This is a demo backend using FastAPI, Postgres, Twilio, and Eleven Labs for speech.  
+We store calls in a Postgres database and manage the call flow with Twilio.  
+Eleven Labs provides speech functionality.
+
+---
+
+## Tech Stack
+
+- **Backend**: FastAPI, Python 3.11
+- **Database**: Postgres (via `sqlmodel`)
+- **Twilio**: For phone interactions
+- **Eleven Labs**: For speech functionality
+- **Deployment**: Docker & docker-compose (local), Replit, or any other environment
+
+---
+
+## Project Structure
+
+You will generally see the following layout in `app/`:
+
+- **`app/main.py`** – FastAPI entrypoint and router setup
+- **`app/dependencies.py`** – Dependency injection for repositories & services
+- **`app/database.py`** – Database connections and session management
+- **`app/models.py`** – SQLModel data models
+- **`app/routers`** – FastAPI route definitions
+- **`app/repositories`** – Database interactions and queries
+- **`app/services`** – Business logic for each module
+- **`app/utils`** – Utility modules (e.g., Twilio interfaces, logging)
+- **`migrations`** – SQL scripts for initial setup or manual migrations
+
+Additionally, you may see:
+
+- **`docker-compose.yml`** – Compose file to run the API and Postgres together
+- **`Dockerfile`** – Docker build definition
+- **`Makefile`** – Various scripts to build, run, and manage the app
+- **`.env`** – Holds environment variables (never commit actual credentials)
+- **`requirements.txt`** – Python dependencies
+- **`README.md`** – Project overview and instructions
+
+---
+
+## Rules
+
+### 1. **General Rules**
+
+1. **Always** keep your code strongly typed. Use Python type hints wherever possible, including function parameters and return types.
+2. For new code, **always** use Python 3.11 or higher.
+3. Import modules with standard Python imports (e.g., `from app.services.calls import CallService`).
+4. **Never** expose private environment variables (e.g., Twilio secrets, Eleven Labs keys) in your code or logs.
+5. Keep environment variables in `.env` (or environment-specific `.env.*`) and load them in the app with `os.environ`.
+6. Log with `logging` instead of `print` statements.
+
+---
+
+### 2. **Environment Variables**
+
+- Place environment variables in `.env` or on your deployment environment.
+- **Required** environment variables (examples; can vary by project needs):
+  - `DATABASE_URL` – Postgres connection string
+  - `ELEVENLABS_API_KEY` – Eleven Labs API key
+  - `ELEVENLABS_AGENT_ID` – Identifier for your Eleven Labs agent (if using conversation features)
+  - `TWILIO_AUTH_TOKEN` / `TWILIO_ACCOUNT_SID` – Twilio credentials
+- **Never** commit secrets or sensitive data to the repository.
+
+---
+
+### 3. **Database Rules**
+
+- Use **SQLModel** for the data models (ORM).
+- Keep your table schema definitions in `app/models.py`.
+- Perform migrations manually or store them in `migrations/` (if you have any).
+  - You can run them in Docker or Replit as needed.
+- For data operations (CRUD), use a repository class in `app/repositories`.
+  - The repository should handle the actual queries and commits.
+- **Always** handle exceptions gracefully in the repository layer or service layer.
+
+#### Example Workflow to Add a Table
+
+1. **Create a new model** in `app/models.py`:
+
+   ```python
+   from sqlmodel import SQLModel, Field
+   from uuid import UUID, uuid4
+   import datetime
+
+   class Example(SQLModel, table=True):
+       __tablename__ = "examples"
+       id: UUID = Field(default_factory=uuid4, primary_key=True)
+       created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+       updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+       name: str
+   ```
+
+````
+
+2. **Create a matching repository in app/repositories/example.py**:
+
+```python
+from sqlmodel import Session, select
+from typing import List, Optional
+from uuid import UUID
+
+from app.models import Example
+
+class ExampleRepository:
+  def __init__(self, session: Session) -> None:
+      self.session = session
+
+  def create_example(self, example: Example) -> Example:
+      """Create a new Example record."""
+      self.session.add(example)
+      self.session.commit()
+      self.session.refresh(example)
+      return example
+
+  def get_example(self, example_id: UUID) -> Optional[Example]:
+      """Retrieve a single Example by its UUID."""
+      return self.session.get(Example, example_id)
+
+  def list_all_examples(self) -> List[Example]:
+      """List all Example records."""
+      return self.session.exec(select(Example)).all()
+
+  def update_example(self, example_id: UUID, data: dict) -> Optional[Example]:
+      """
+      Update an Example record with the given data dictionary.
+      Returns None if not found.
+      """
+      example = self.session.get(Example, example_id)
+      if not example:
+          return None
+
+      for key, value in data.items():
+          setattr(example, key, value)
+
+      self.session.commit()
+      self.session.refresh(example)
+      return example
+
+  def delete_example(self, example_id: UUID) -> bool:
+      """
+      Delete an Example record by its UUID.
+      Returns True if deletion succeeded, False otherwise.
+      """
+      example = self.session.get(Example, example_id)
+      if not example:
+          return False
+
+      self.session.delete(example)
+      self.session.commit()
+      return True
+````
+
+### 4. Routers & Services Rules
+
+- Place API endpoints in `app/routers/<some_module>.py`.
+- Each route typically corresponds to a resource or domain (e.g., `calls.py` for the Twilio call interactions).
+- For more complex business logic, use a service class in `app/services/<some_module>.py`.
+- The service class orchestrates calls to repositories, Twilio, Eleven Labs, etc.
+- Keep route functions minimal — they should mostly handle request/response. Let the service do the heavy lifting.
+
+### 5. Utilities and Logging
+
+- Place shared utilities in `app/utils`.
+  - E.g., `logger.py` to set up global logging, or `twilio_audio_interface.py` for Twilio-based streaming.
+- Always log relevant info and errors with the `logging` module.
+- **Never** log full secrets or PII.
+
+### 6. Testing & Type Checking
+
+- Use `pytest` (if testing is relevant) or another testing framework.
+- Always type-check new code using `mypy` if applicable.
+- The `mypy.ini` file should enforce strict type checking on the project.
+
+### 7. Twilio Integration Rules
+
+- For Twilio callback routes, ensure the method can handle both `GET` and `POST` (if needed).
+- Validate incoming data from Twilio: e.g., `CallSid`, `From`, `To`.
+- Log errors when data is missing or invalid.
+- If streaming audio, handle WebSocket connections carefully and close them properly.
+
+### 8. Eleven Labs Integration Rules
+
+- Use the official `elevenlabs` Python library.
+- Store your Eleven Labs API key in `.env` as `ELEVENLABS_API_KEY`.
+- If you’re using the conversation features, store the agent ID (e.g., `ELEVENLABS_AGENT_ID`) in `.env` too.
+- **Never** commit these keys.
+
+
