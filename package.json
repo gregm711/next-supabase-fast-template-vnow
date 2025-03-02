@@ -1,7 +1,9 @@
 {
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "fastapi-dev": "pip install -r fast-api/requirements.txt && python fast-api/run.py",
+    "next-dev": "next dev",
+    "dev": "concurrently \"npm run next-dev\" \"npm run fastapi-dev\"",
     "build": "next build",
     "start": "next start"
   },
@@ -20,6 +22,7 @@
     "autoprefixer": "10.4.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "concurrently": "^9.1.2",
     "google-one-tap": "^1.0.6",
     "lucide-react": "^0.468.0",
     "next": "latest",

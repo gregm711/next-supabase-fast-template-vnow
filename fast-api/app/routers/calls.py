@@ -15,6 +15,10 @@ router = APIRouter(
 )
 
 
+@router.get("/some-unprotected-endpoint")
+async def some_unprotected_endpoint():
+    return JSONResponse(content={"message": "Hello, world!"})
+
 @router.get("/auth-health-check")
 async def health_check(user_id: str = Depends(get_current_user_id)):
     return JSONResponse(content={"message": f"Hello user with id {user_id}!"})

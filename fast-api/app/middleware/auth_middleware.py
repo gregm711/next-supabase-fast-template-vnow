@@ -7,9 +7,10 @@ import jwt
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+
         # Example how to bypass auth for a specific endpoint and preflight requests
         if (
-            request.url.path.startswith("/some-unprotected-endpoint")
+            request.url.path.startswith("/unprotected") or request.url.path.startswith("/favicon.ico")
             or request.method == "OPTIONS"
         ):
             return await call_next(request)
